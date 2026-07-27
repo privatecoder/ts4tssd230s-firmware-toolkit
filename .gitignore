@@ -1,0 +1,24 @@
+# --- Proprietary vendor bits — never commit; setup.sh fetches/builds them ---
+
+# Vendor firmware ISO (download via setup.sh from the leopard-archives release)
+TS4TSSD230S_41-6440_22Z4X4IA.iso
+*.iso
+
+# Assembled working folder: vendor flasher + firmware + the built patched binary
+ts-ssd230s-fw-update/
+
+# Patched vendor binary (reproduce locally with recovery/patch_flasher.py)
+SM2258TLC_3D_LinuxTool_64.patched
+# Raw vendor flasher / firmware images, wherever they land
+SM2258TLC_3D_LinuxTool_32
+SM2258TLC_3D_LinuxTool_64
+REGBIN/
+*.4fs
+ISP2259*.bin*
+
+# --- OS / editor / tooling cruft ---
+.DS_Store
+**/.DS_Store
+__pycache__/
+*.pyc
+.claude/
