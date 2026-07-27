@@ -38,9 +38,9 @@ SERIAL_LEN   = 20            # ATA serial number field width (bytes)
 WWN_LEN      = 8
 EXPECTED_SIZE = 789504       # ISP2259.bin size for this model
 
-# Verify the ISP is the known vendor image WITHOUT rejecting a file we've already
+# Verify the ISP is the known vendor image WITHOUT rejecting a file already
 # patched: hash the image with the three identity fields (serial x2 + WWN) zeroed.
-# This is stable across the pristine ISP and any serial/WWN we write, so re-running
+# This is stable across the pristine ISP and any serial/WWN written, so re-running
 # to change the serial still validates. (A plain full checksum would falsely fail.)
 TEMPLATE_MASKED_SHA256 = "da08375b3f31f4603757618495476257d8ca35dd563f3afb2df70385bfe98615"
 #   full pristine ISP2259.bin (22Z4X4IA) SHA256, for reference only:

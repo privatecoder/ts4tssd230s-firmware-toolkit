@@ -147,7 +147,7 @@ chmod +x "$OUT/patch_identity.py"
 
 # --- 6. make the output usable by the invoking user ----------------------------
 # extracted dirs (e.g. REGBIN) carry the image's restrictive 0700 mode; ensure the
-# owner can traverse/read them, and if we ran under sudo hand everything back to
+# owner can traverse/read them, and if run under sudo, hand everything back to
 # the real user (otherwise the files stay root-owned and inaccessible).
 chmod -R u+rwX "$OUT"
 if [ "$(id -u)" = 0 ] && [ -n "${SUDO_USER:-}" ]; then

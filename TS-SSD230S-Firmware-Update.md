@@ -650,7 +650,7 @@ the tool's own `ModifyISPFile` does at manufacturing.
 
 ## Reference — what's in the bundle
 
-**This repo (your original work — the only things committed):**
+**Committed to this repository (documentation + scripts):**
 
 ```
 .
@@ -700,15 +700,14 @@ ts-ssd230s-fw-update/
 | `showIDinfo`, `dump_log` | — | Print card info / dump event log. |
 
 > Only **`initial` (mode 0)** skips the keep-data step (`ModifyISPFile` →
-> `DumpISPBlock`) — every other mode reads the on-NAND system blocks, which is the
-> step that bricked a drive here (`Tran Sys block fail`). The **model name is a
+> `DumpISPBlock`) — every other mode reads the on-NAND system blocks, the step
+> where a `Tran Sys block fail` can brick the drive. The **model name is a
 > constant in `ISP2259.bin`** (not per-drive data), so it's always correct after
 > flashing the matching-model image — no restore needed.
 
 The Transcend ISO's own config (`/root/Startup/FWUpdateInfo.ini`) specifies
 `Command=keepsn_1` for this model — that (mode 3) is what an orchestrated update
-runs, and it's the path that bricked a drive here when it couldn't read a system
-block.
+runs — the path that can brick the drive if it can't read a system block.
 
 ---
 
