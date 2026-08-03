@@ -22,3 +22,10 @@ ISP2259*.bin*
 __pycache__/
 *.pyc
 .claude/
+
+# archives of the working folder (proprietary)
+*.zip
+*.tar
+*.tar.*
+*.7z
+ts-ssd230s-fw-update*

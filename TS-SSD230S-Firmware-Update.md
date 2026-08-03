@@ -599,6 +599,121 @@ the tool's own `ModifyISPFile` does at manufacturing.
 
 ---
 
+## Part L — Non-destructive firmware update (experimental)
+
+> 🧪 **Experimental / unproven.** This documents a *candidate* way to update
+> firmware **without wiping data**, reconstructed from the tool's disassembly. It
+> is **not verified safe** and can corrupt data or brick a drive — **only test it
+> on a scratch drive with backed-up / disposable data.** For real data, use the
+> normal (destructive) flow: back up → flash → restore.
+
+The destructive `keepsn_1`/`initial` modes run a full re-init (ROM → Shim → MPISP
+→ **pretest** → program) that rebuilds the flash-translation layer and wipes data.
+The **`update` / `swap`** modes take a different route (`SwapISP`): they run
+**in place from the live firmware** with *no* ROM cycle and *no* pretest — the
+structural profile of a firmware-only update that could preserve data. See the
+appendix "Two flash paths".
+
+### Why `update` fails out of the box
+
+Running `update` gets all the way through the flash-ID check and a **read-only**
+ISP dump, then stops at:
+
+```
+Compare FW Version ... FW Version from bin File: 22Z4X4IA
+Dump ISP block ... Verify DumpISP 1/2 Pass
+FW Version from Flash: 22Z4W14B
+./REGBIN/2259/FWVerDB.ini not exist!
+Update failed..
+```
+
+`CheckBinISPVerWithFlash` consults a **compatibility whitelist**, `FWVerDB.ini`,
+that the vendor ISO does not ship. Its logic: find the drive's current version in
+`[UPDATE_FWTable]` (`FWVer_N` keys); then, in `[UPDATE_<that version>]`, check
+whether the new bin version is listed under `FWSupportVer_N`. Listed → allowed;
+missing file → the failure above.
+
+### Enabling it
+
+A reconstructed [`recovery/FWVerDB.ini`](recovery/FWVerDB.ini) whitelists the
+`22Z4W14B → 22Z4X4IA` transition (INI: `[section]`, `key=value`, `;`comments):
+
+```ini
+[UPDATE_FWTable]
+FWVer_1=22Z4W14B
+
+[UPDATE_22Z4W14B]
+FWSupportVer_1=22Z4X4IA
+
+[SWAP_FWTable]
+FWVer_1=22Z4W14B
+
+[SWAP_22Z4W14B]
+FWSupportVer_1=22Z4X4IA
+```
+
+It is **not** installed by `setup.sh` (opt-in only). To try it, copy it in:
+
+```sh
+cp /path/to/recovery/FWVerDB.ini ts-ssd230s-fw-update/REGBIN/2259/FWVerDB.ini
+```
+
+> ⚠️ This *fabricates* a compatibility the vendor never sanctioned. Clearing the
+> gate lets `update` proceed to the in-place `ModifyISPFile → WriteISPFirmware`
+> write — **whether the FTL/data actually survive is still unproven.** If the two
+> firmwares' on-NAND formats differ, the in-place write can corrupt or brick.
+
+### Test protocol (scratch drive only)
+
+On a **spare** TS4TSSD230S on `22Z4W14B` with nothing you care about:
+
+```sh
+# 1. write a known pattern + record checksums across the full capacity
+f3write /mnt/scratch && f3read /mnt/scratch          # or: badblocks -w, or dd a known file + sha256
+
+# 2. install the whitelist, then run UPDATE (not keepsn_1)
+cp /path/to/recovery/FWVerDB.ini ts-ssd230s-fw-update/REGBIN/2259/
+cd ts-ssd230s-fw-update
+./SM2258TLC_3D_LinuxTool_64 /dev/sdX update
+
+# 3. power-cycle, then verify BOTH
+smartctl -i /dev/sdX | grep -i firmware               # expect 22Z4X4IA
+f3read /mnt/scratch                                    # expect data intact
+```
+
+### Observed result (22Z4W14B → 22Z4X4IA)
+
+Tested on a healthy drive. With `FWVerDB.ini` in place the **version gate passes**
+(`Compare FW Version … Success`) — the reconstruction is correct. But `update`
+then **dead-ends at the keep-data step**:
+
+```
+Compare FW Version … Success
+Dump ISP for keep data …
+Dump ISP Fail
+Verify ISP Error
+Download ISP Check Data Fail!
+Update failed..   ErrorCode: 0001
+```
+
+`ModifyISPFile` calls `DumpISPBlock`, which reads the drive's **two on-NAND ISP
+copies and verifies they're identical — and they don't match**. This is the *same*
+keep-data mechanism, shared by `keepsn` / `update` / `swap`, that failed on the
+original bricked drive (`Tran Sys block fail`). Only plain `initial` (mode 0)
+avoids it — and mode 0 wipes.
+
+It fails **before any controller write** (a read + local-file verify), so the
+drive is untouched and stays on its current firmware — the experiment is safe.
+
+**Conclusion for this firmware pair:** there is **no working non-destructive
+update** with this tool. Every data-preserving mode routes through the failing
+keep-data ISP dump; the only mode that skips it (mode 0) rebuilds the FTL and
+wipes. Use wipe-and-restore, or mode-0 + `patch_identity.py`. (Going further —
+e.g. patching out the two-copy verify in `DumpISPBlock` — would feed unverified
+keep-data into flash: high brick risk, not recommended.)
+
+---
+
 ## Troubleshooting
 
 - **`-list` just prints the usage/help banner.** Expected — NVMe-only. Target the
@@ -781,8 +896,10 @@ Per-mode keep-data (tool's own `--help`; all four `update`/`swap` route through
 | `swap` (7) | CID + IDtable(ATA-EC) + SN | FW ver |
 | `swap_1` (8) | CID + IDtable(ISP_Block) + SN | FW ver |
 
-> **Data:** `update`/`swap` skip the full re-init/pretest, so they *might* preserve
-> user data (firmware-only swap) — but this is **unverified**; don't rely on it.
+> **Data:** `update`/`swap` skip the full re-init/pretest, so they *look* like a
+> data-preserving firmware-only swap — but **tested, they dead-end at the keep-data
+> ISP dump** (shared with `keepsn`) and never complete. See Part L. Net: no working
+> non-destructive path with this tool.
 
 ### `ModifyISPFile` — the keep-data patcher (internal, not a CLI command)
 
